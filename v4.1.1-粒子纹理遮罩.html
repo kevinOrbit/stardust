@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>流体粒子星球 - Stardust Edition</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+    :root {
+        /* 背景保持深空，衬托亮球体 */
+        --bg-gradient: radial-gradient(circle at 50% 120%, #1b2735 10%, #090a0f 100%);
+        --text-color: #ffffff;
+        --panel-bg: rgba(20, 20, 30, 0.7);
+        --panel-border: rgba(255, 255, 255, 0.1);
+        --panel-shadow: 0 -10px 40px rgba(0,0,0,0.5);
+        --mx: 0; --my: 0;
+        --blob-size: 115px;
+        --breath-anim-name: none;
+    }
+
+    /* 星空背景保持不变 */
+    body::before {
+        content: ""; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-image: 
+            radial-gradient(1px 1px at 10% 10%, rgba(255,255,255,0.8) 50%, transparent),
+            radial-gradient(1px 1px at 20% 20%, rgba(255,255,255,0.6) 50%, transparent),
+            radial-gradient(2px 2px at 30% 60%, rgba(255,255,255,0.7) 50%, transparent),
+            url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.6' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+        background-size: 550px 550px, 350px 350px, 250px 250px, 200px 200px;
+        opacity: 0.6; z-index: -1; pointer-events: none;
+    }
+
+    body {
+        background: var(--bg-gradient); color: var(--text-color); margin: 0; padding: 35px;
+        font-family: 'SF Pro Display', system-ui, sans-serif;
+        display: flex; flex-direction: column; align-items: center; min-height: 100vh; overflow-x: hidden;
+    }
+
+    header { position: relative; z-index: 10; margin-bottom: 20px; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 40px; max-width: 1000px; width: 100%; justify-items: center; padding-bottom: 180px; perspective: 1000px; }
+    @media (min-width: 640px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+    @media (min-width: 768px) { .grid { grid-template-columns: repeat(4, 1fr); } }
+    @media (max-width: 639px) { :root { --blob-size: 150px; } .grid { gap: 20px; } }
+
+    /* === 核心球体样式调整 === */
+    .blob {
+        width: var(--blob-size);
+        height: var(--blob-size);
+        border-radius: 50%;
+        background-size: 200% 200%;
+        position: relative;
+        cursor: pointer; 
+        transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        
+        /* 保持你的阴影设置 */
+        box-shadow: 
+            inset calc(var(--mx) * -20px) calc(var(--my) * -20px) 40px rgba(255,255,255,0.4),
+            inset -10px -10px 30px rgba(0,0,0,0.4),
+            0 0 25px rgba(var(--glow-rgb, 255,255,255), 0.2);
+            
+        -webkit-tap-highlight-color: transparent;
+
+        /* === 关键修复代码 Start === */
+        overflow: hidden; /* 基础裁剪 */
+        
+        /* 强制浏览器严格按照圆形裁剪内容，解决纹理溢出的方形问题 */
+        -webkit-mask-image: -webkit-radial-gradient(white, black);
+        mask-image: radial-gradient(white, black);
+        
+        /* 开启硬件加速，防止裁剪时的边缘锯齿 */
+        transform: translateZ(0);
+        /* === 关键修复代码 End === */
+    }
+
+    .blob:hover { transform: scale(1.1) translateY(-5px); z-index: 10; box-shadow: inset calc(var(--mx) * -30px) calc(var(--my) * -30px) 40px rgba(255,255,255,0.6), inset -10px -10px 30px rgba(0,0,0,0.4), 0 0 50px rgba(var(--glow-rgb), 0.5); }
+
+    /* === 修改点2：粒子效果纹理 === */
+    .blob::after {
+        content: "";
+        position: absolute;
+        inset: 0; /* 贴合父元素边界 */
+        width: 100%;
+        height: 100%;
+        border-radius: 50%; /* 给纹理层也加圆角，双重保险 */
+        
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.5' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 15 -9' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+        
+        opacity: 0.35;
+        mix-blend-mode: color-dodge;
+        pointer-events: none;
+        
+        /* 
+           这里使用 scale(1.5) 放大纹理，而不是改变宽高。
+           这样纹理比球体大（为了旋转时不露底），
+           但因为父元素加了 mask-image，多余部分会被完美切掉。
+        */
+        transform: scale(1.5); 
+        animation: spinTexture 20s linear infinite; 
+    }
+
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* 必须配合修改动画：保留缩放 scale(1.5) 并叠加旋转 */
+    @keyframes spinTexture { 
+        0% { transform: scale(1.5) rotate(0deg); } 
+        100% { transform: scale(1.5) rotate(-360deg); } 
+    }
+    @keyframes breathe { 0%, 100% { scale: 1; } 50% { scale: 1.05; } }
+    .grid.breath-active { --breath-anim-name: breathe; }
+
+    /* 面板样式 (保持不变) */
+    .controls { position: fixed; bottom: 20px; background: var(--panel-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); padding: 18px 60px; border-radius: 24px; box-shadow: var(--panel-shadow); border: 1px solid var(--panel-border); display: flex; flex-wrap: wrap; gap: 20px; align-items: center; z-index: 100; max-width: 95%; justify-content: center; transition: transform 0.4s; color: white; }
+    @media (max-width: 639px) { .controls { bottom: 0; max-width: 100%; border-radius: 28px 28px 0 0; border: none; border-top: 1px solid rgba(255,255,255,0.1); flex-direction: column; align-items: stretch; transform: translateY(calc(100% - 44px)); } .drag-handle-area { display: flex; height: 44px; justify-content: center; align-items: center; margin-top: -10px; padding-top: 10px; } .drag-pill { width: 36px; height: 5px; background-color: rgba(255, 255, 255, 0.2); border-radius: 10px; } .control-item { width: 100%; flex-direction: row; justify-content: space-between; align-items: center; } .control-item:first-of-type { flex-direction: column; align-items: flex-start; } .control-item:first-of-type .color-group { width: 100%; margin-top: 8px; } .toggle-group { flex-direction: row; } button { width: 100%; margin-top: 10px; } }
+    .control-item label { font-size: 0.8rem; font-weight: 600; opacity: 0.8; }
+    .color-group { display: flex; gap: 12px; } .color-input-wrapper { display: flex; transition: 0.3s; overflow: hidden; } .color-input-wrapper.hidden { width: 0; opacity: 0; }
+    input[type="color"] { border: none; background: none; height: 40px; width: 40px; border-radius: 50%; padding: 0; cursor: pointer; } input[type="color"]::-webkit-color-swatch { border: 2px solid rgba(255,255,255,0.2); border-radius: 50%; }
+    input[type="range"] { width: 115px; accent-color: white; } @media (max-width: 639px) { input[type="range"] { width: 50%; } }
+    .toggle-switch { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 600; }
+    button { padding: 12px 24px; border-radius: 14px; background: white; color: black; border: none; font-weight: 600; cursor: pointer; } button:active { transform: scale(0.96); }
+    #toast { position: fixed; top: 30px; left: 50%; transform: translateX(-50%) translateY(-20px); background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.1); padding: 12px 24px; border-radius: 50px; opacity: 0; pointer-events: none; transition: 0.3s; z-index: 200; backdrop-filter: blur(10px); } #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+</style>
+</head>
+<body>
+
+<header id="gradient-display" class="flex flex-col items-center justify-center p-3">
+    <div id="title-display" class="text-2xl md:text-4xl font-bold tracking-wider text-white">Stardust Orbs</div>
+    <div id="text-display" class="subtitle text-sm font-bold tracking-wider text-white opacity-60 mt-1">@Kaimana</div>
+</header>
+
+<div class="grid" id="grid"></div>
+<div id="toast">✅ CSS 已复制</div>
+
+<div class="controls" id="controlPanel">
+    <div class="drag-handle-area" id="dragHandle"><div class="drag-pill"></div></div>
+    <div class="control-item">
+        <div style="display:flex; justify-content:space-between; width:100%;">
+            <label>主色调</label>
+            <label class="toggle-switch" style="font-size: 0.75rem;"><input type="checkbox" id="dualColorToggle"> 双色</label>
+        </div>
+        <div class="color-group">
+            <input type="color" id="colorPicker1" value="#00d2ff"> <!-- 更亮的青蓝色 -->
+            <div class="color-input-wrapper hidden" id="colorInput2Wrapper">
+                <input type="color" id="colorPicker2" value="#ff2a6d"> <!-- 亮粉色 -->
+            </div>
+        </div>
+    </div>
+    <div class="control-item"><label>色彩异变</label><input type="range" id="varianceRange" min="0" max="100" value="40"></div>
+    <div class="control-item"><label>数量 <span id="countVal" style="opacity:0.6; margin-left:5px">6</span></label><input type="range" id="countRange" min="4" max="12" value="6"></div>
+    <div class="control-item"><label>直径 <span id="sizeVal" style="opacity:0.6; margin-left:5px">115px</span></label><input type="range" id="sizeRange" min="90" max="250" value="115"></div>
+    <div class="toggle-group" style="display:flex; justify-content:space-between; width:100%;">
+        <label class="toggle-switch"><input type="checkbox" id="diffusionToggle"> 弥散</label>
+        <label class="toggle-switch"><input type="checkbox" id="breathToggle" checked> 呼吸</label>
+    </div>
+    <button onclick="regenerate()">✨ 生成新星</button>
+</div>
+
+<div id="backdrop" style="position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:90; opacity:0; pointer-events:none; transition:opacity 0.3s;"></div>
+
+<script>
+/* 移动端抽屉逻辑 */
+const panel = document.getElementById('controlPanel'), handle = document.getElementById('dragHandle'), backdrop = document.getElementById('backdrop');
+let startY = 0, isOpen = false, isDragging = false;
+function initMobileSheet() { if (window.innerWidth > 639) { panel.style.transform = ''; return; } togglePanel(false); }
+function togglePanel(open) {
+    isOpen = open; if (window.innerWidth > 639) return;
+    panel.style.transform = open ? `translateY(0px)` : `translateY(${panel.offsetHeight - 44}px)`;
+    backdrop.style.opacity = open ? '1' : '0'; backdrop.style.pointerEvents = open ? 'auto' : 'none';
+}
+handle.addEventListener('click', () => togglePanel(!isOpen));
+backdrop.addEventListener('click', () => togglePanel(false));
+handle.addEventListener('touchstart', (e) => { isDragging = true; startY = e.touches[0].clientY; panel.style.transition = 'none'; }, { passive: true });
+handle.addEventListener('touchmove', (e) => {
+    if (!isDragging) return;
+    let newY = isOpen ? e.touches[0].clientY - startY : (panel.offsetHeight - 44) + (e.touches[0].clientY - startY);
+    panel.style.transform = `translateY(${Math.max(0, newY)}px)`;
+}, { passive: true });
+handle.addEventListener('touchend', (e) => {
+    isDragging = false; panel.style.transition = 'transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1)';
+    Math.abs(e.changedTouches[0].clientY - startY) > 50 ? ((e.changedTouches[0].clientY - startY) > 0 ? togglePanel(false) : togglePanel(true)) : togglePanel(isOpen);
+});
+window.addEventListener('resize', initMobileSheet); setTimeout(initMobileSheet, 100);
+
+/* 交互与生成 */
+document.addEventListener('mousemove', (e) => {
+    document.documentElement.style.setProperty('--mx', ((e.clientX / window.innerWidth) * 2 - 1).toFixed(2));
+    document.documentElement.style.setProperty('--my', ((e.clientY / window.innerHeight) * 2 - 1).toFixed(2));
+});
+function hexToHSL(hex) {
+    hex = hex.replace("#", "");
+    const r = parseInt(hex.substring(0,2),16)/255, g = parseInt(hex.substring(2,4),16)/255, b = parseInt(hex.substring(4,6),16)/255;
+    const max = Math.max(r,g,b), min = Math.min(r,g,b);
+    let h, s, l = (max + min) / 2;
+    if(max !== min){ const d = max - min; s = l > .5 ? d / (2 - max - min) : d / (max + min); h = (max===r?(g-b)/d+(g<b?6:0):max===g?(b-r)/d+2:(r-g)/d+4)*60; }
+    else h = s = 0;
+    return { h, s: s*100, l: l*100 };
+}
+function rr(a,b){ return a + Math.random()*(b-a); }
+
+function generateBlobGradient(baseH1, baseH2, useDual, hueVariance, element) {
+    const layers = Math.floor(rr(4, 7)); 
+    let gradients = [];
+
+    // === 修改点1：提升亮度范围 ===
+    // 之前是 25-45 (深色)，现在改为 55-75 (中高亮，色彩更鲜艳)
+    const baseL = rr(55, 75); 
+    const baseS = rr(70, 95); // 提高饱和度
+
+    const mainHue = useDual ? (Math.random() > 0.5 ? baseH1.h : baseH2.h) : baseH1.h;
+    element.style.setProperty('--glow-rgb', `hsl(${mainHue}, 90%, 70%)`);
+
+    let bgGradient;
+    if(useDual) {
+        bgGradient = `linear-gradient(135deg, hsl(${baseH1.h}, ${baseH1.s}%, ${baseL}%) 0%, hsl(${baseH2.h}, ${baseH2.s}%, ${baseL-10}%) 100%)`;
+    } else {
+        bgGradient = `linear-gradient(135deg, hsl(${baseH1.h}, ${baseH1.s}%, ${baseL}%) 0%, hsl(${(baseH1.h+30)%360}, ${baseH1.s}%, ${baseL-15}%) 100%)`;
+    }
+    gradients.push(bgGradient);
+
+    for(let i=0; i<layers; i++){
+        let currentBase = useDual ? (Math.random() > 0.5 ? baseH1 : baseH2) : baseH1;
+        const h = (currentBase.h + rr(-hueVariance, hueVariance) + 360) % 360;
+        const s = rr(60, 100); 
+        // 内部光斑亮度也相应提高，确保能看见
+        const l = rr(70, 95); 
+        
+        const x = rr(0, 100); const y = rr(0, 100); const size = rr(30, 70); const opacity = rr(0.4, 0.8);
+        gradients.push(`radial-gradient(circle at ${x}% ${y}%, hsl(${h},${s}%,${l}% ,${opacity}) 0%, transparent ${size}%)`);
+    }
+    return gradients.reverse().join(","); 
+}
+
+function copyToClipboard(div, gradient) {
+    navigator.clipboard.writeText(`background: ${gradient}; border-radius: 50%; box-shadow: inset -10px -10px 30px rgba(0,0,0,0.4), 0 0 25px rgba(255,255,255,0.2);`).then(() => {
+        const toast = document.getElementById("toast"); toast.classList.add("show"); setTimeout(() => toast.classList.remove("show"), 2000);
+    });
+}
+
+function renderAll() {
+    const hex1 = document.querySelector("#colorPicker1").value;
+    const hex2 = document.querySelector("#colorPicker2").value;
+    const useDual = document.querySelector("#dualColorToggle").checked;
+    const baseH1 = hexToHSL(hex1);
+    const baseH2 = hexToHSL(hex2);
+    const hueVariance = parseInt(document.querySelector("#varianceRange").value);
+    const size = document.querySelector("#sizeRange").value;
+    const count = parseInt(document.querySelector("#countRange").value);
+    
+    document.querySelector("#countVal").textContent = count;
+    document.querySelector("#sizeVal").textContent = size + 'px';
+    const grid = document.querySelector("#grid");
+    grid.style.setProperty('--blob-size', size + 'px');
+    grid.innerHTML = "";
+    
+    for(let i=0; i<count; i++){
+        const div = document.createElement("div");
+        div.className = "blob";
+        const bgStyle = generateBlobGradient(baseH1, baseH2, useDual, hueVariance, div);
+        div.style.background = bgStyle;
+        div.onclick = () => copyToClipboard(div, bgStyle);
+        const spinTime = rr(5, 10) + 's';
+        const breathTime = rr(4, 8) + 's';
+        const dir = Math.random() > 0.5 ? 'normal' : 'reverse';
+        div.style.animation = `spin ${spinTime} linear infinite ${dir}, var(--breath-anim-name) ${breathTime} ease-in-out infinite`;
+        grid.appendChild(div);
+    }
+}
+
+document.querySelector("#dualColorToggle").addEventListener("change", (e) => {
+    const wrapper = document.querySelector("#colorInput2Wrapper");
+    e.target.checked ? wrapper.classList.remove("hidden") : wrapper.classList.add("hidden");
+    renderAll();
+});
+document.querySelectorAll("input[type=color], input[type=range]").forEach(el => el.addEventListener("change", renderAll));
+document.querySelector("#countRange").addEventListener("input", (e) => document.querySelector("#countVal").textContent = e.target.value);
+document.querySelector("#sizeRange").addEventListener("input", (e) => { document.querySelector("#sizeVal").textContent = e.target.value + 'px'; document.querySelector("#grid").style.setProperty('--blob-size', e.target.value + 'px'); });
+document.querySelector("#diffusionToggle").addEventListener("change", (e) => document.querySelector("#grid").classList.toggle("diffusion-active", e.target.checked));
+document.querySelector("#breathToggle").addEventListener("change", (e) => document.querySelector("#grid").classList.toggle("breath-active", e.target.checked));
+function regenerate(){ renderAll(); }
+document.querySelector("#breathToggle").checked = true; document.querySelector("#grid").classList.add("breath-active"); renderAll();
+</script>
+</body>
+</html>
