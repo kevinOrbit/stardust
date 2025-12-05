@@ -15,7 +15,7 @@
         --panel-border: rgba(255, 255, 255, 0.1);
         --panel-shadow: 0 -10px 40px rgba(0,0,0,0.5);
         --mx: 0; --my: 0;
-        --blob-size: 115px;
+        --blob-size: 130px;
         --breath-anim-name: none;
     }
 
@@ -84,9 +84,9 @@
         height: 100%;
         border-radius: 50%; /* 给纹理层也加圆角，双重保险 */
         
-        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.5' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 15 -9' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.6' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 10 -4' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
         
-        opacity: 0.35;
+        opacity: 0.12;
         mix-blend-mode: color-dodge;
         pointer-events: none;
         
@@ -114,7 +114,7 @@
     .control-item label { font-size: 0.8rem; font-weight: 600; opacity: 0.8; }
     .color-group { display: flex; gap: 12px; } .color-input-wrapper { display: flex; transition: 0.3s; overflow: hidden; } .color-input-wrapper.hidden { width: 0; opacity: 0; }
     input[type="color"] { border: none; background: none; height: 40px; width: 40px; border-radius: 50%; padding: 0; cursor: pointer; } input[type="color"]::-webkit-color-swatch { border: 2px solid rgba(255,255,255,0.2); border-radius: 50%; }
-    input[type="range"] { width: 115px; accent-color: white; } @media (max-width: 639px) { input[type="range"] { width: 50%; } }
+    input[type="range"] { width: 130px; accent-color: white; } @media (max-width: 639px) { input[type="range"] { width: 50%; } }
     .toggle-switch { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 600; }
     button { padding: 12px 24px; border-radius: 14px; background: white; color: black; border: none; font-weight: 600; cursor: pointer; } button:active { transform: scale(0.96); }
     #toast { position: fixed; top: 30px; left: 50%; transform: translateX(-50%) translateY(-20px); background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.1); padding: 12px 24px; border-radius: 50px; opacity: 0; pointer-events: none; transition: 0.3s; z-index: 200; backdrop-filter: blur(10px); } #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
@@ -146,7 +146,7 @@
     </div>
     <div class="control-item"><label>色彩异变</label><input type="range" id="varianceRange" min="0" max="100" value="40"></div>
     <div class="control-item"><label>数量 <span id="countVal" style="opacity:0.6; margin-left:5px">6</span></label><input type="range" id="countRange" min="4" max="12" value="6"></div>
-    <div class="control-item"><label>直径 <span id="sizeVal" style="opacity:0.6; margin-left:5px">115px</span></label><input type="range" id="sizeRange" min="90" max="250" value="115"></div>
+    <div class="control-item"><label>直径 <span id="sizeVal" style="opacity:0.6; margin-left:5px">130px</span></label><input type="range" id="sizeRange" min="90" max="250" value="130"></div>
     <div class="toggle-group" style="display:flex; justify-content:space-between; width:100%;">
         <label class="toggle-switch"><input type="checkbox" id="diffusionToggle"> 弥散</label>
         <label class="toggle-switch"><input type="checkbox" id="breathToggle" checked> 呼吸</label>
@@ -280,3 +280,4 @@ document.querySelector("#breathToggle").checked = true; document.querySelector("
 </script>
 </body>
 </html>
+
